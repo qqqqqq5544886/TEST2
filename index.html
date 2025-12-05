@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Binance Futures Pro (Auto-Config)</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a; --card-bg: #1e293b; --panel-bg: #111827;
+            --accent: #f59e0b; --text: #e2e8f0; --border: #334155;
+            --up: #10b981; --down: #ef4444;
+        }
+        body { font-family: 'Segoe UI', Roboto, Helvetica, sans-serif; background: var(--bg-color); color: var(--text); margin: 0; padding: 20px; }
+        .container { width: 100%; max-width: 1800px; margin: 0 auto; }
+        h1 { text-align: center; background: linear-gradient(to right, #f59e0b, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0 0 20px 0; font-weight: 800; font-size: 2rem; }
+        
+        .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; background: var(--card-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 30px; }
+        .input-group { display: flex; flex-direction: column; gap: 5px; }
+        label { font-size: 0.85em; color: #94a3b8; font-weight: 600; }
+        input, select { padding: 12px; background: var(--bg-color); border: 1px solid var(--border); color: white; border-radius: 6px; outline: none; }
+        input:focus { border-color: var(--accent); }
+        .btn { border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-load { background: #374151; color: white; }
+        .btn-run { background: linear-gradient(135deg, var(--accent), #d97706); color: black; font-size: 1.1em; height: 100%; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .timeframe-section { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 30px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; padding: 20px; }
+        .chart-col { flex: 3; min-width: 600px; height: 520px; }
+        .data-col { flex: 1; min-width: 280px; background: var(--panel-bg); border-radius: 12px; padding: 20px; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: center; }
+        .tf-label { display: inline-block; padding: 6px 15px; border-radius: 6px; font-weight: bold; font-size: 1.2em; margin-bottom: 20px; text-align: center; width: fit-content; align-self: center; }
+        
+        .data-table { width: 100%; border-collapse: collapse; font-size: 1em; }
+        .data-table td { padding: 14px 0; border-bottom: 1px solid #374151; }
+        .data-table tr:last-child td { border-bottom: none; }
+        .dt-label { color: #9ca3af; }
+        .dt-val { text-align: right; font-weight: bold; font-family: 'Courier New', monospace; font-size: 1.1em; }
+        
+        .val-up { color: var(--up); } .val-down { color: var(--down); } .val-warn { color: #fbbf24; } .val-neutral { color: #e5e7eb; }
+        
+        #resultArea { background: var(--panel-bg); padding: 40px; border-radius: 12px; display: none; border: 1px solid var(--border); line-height: 1.8; font-size: 1.05em; border-left: 5px solid var(--accent); margin-top: 40px; }
+        #resultArea h2 { color: #f59e0b; border-bottom: 1px solid #374151; padding-bottom: 10px; margin-top: 1.5em; }
+        #resultArea strong { color: #fff; }
+        .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s infinite linear; margin-right: 8px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Binance Futures Pro (Auto)</h1>
+
+    <div class="controls">
+        <div class="input-group">
+            <label>1. Gemini API Key</label>
+            <input type="password" id="apiKey" placeholder="請在程式碼下方填入 Key">
+            <button id="loadModelsBtn" class="btn btn-load">📡 載入模型</button>
+        </div>
+        <div class="input-group">
+            <label>2. AI Model</label>
+            <select id="modelSelect" disabled><option>等待載入...</option></select>
+        </div>
+        <div class="input-group">
+            <label>3. 合約幣種</label>
+            <input type="text" id="symbol" value="BTCUSDT" placeholder="e.g. ETHUSDT">
+        </div>
+        <div class="input-group" style="justify-content: flex-end;">
+            <button id="runBtn" class="btn btn-run" disabled>🚀 啟動高精度分析</button>
+        </div>
+    </div>
+
+    <div class="timeframe-section"><div class="chart-col" id="chart4h"></div><div class="data-col"><div class="tf-label" style="background: rgba(192, 132, 252, 0.2); color: #c084fc;">4H 趨勢層</div><div id="info4h"></div></div></div>
+    <div class="timeframe-section"><div class="chart-col" id="chart1h"></div><div class="data-col"><div class="tf-label" style="background: rgba(129, 140, 248, 0.2); color: #818cf8;">1H 結構層</div><div id="info1h"></div></div></div>
+    <div class="timeframe-section"><div class="chart-col" id="chart15m"></div><div class="data-col"><div class="tf-label" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8;">15M 進場層</div><div id="info15m"></div></div></div>
+    <div id="resultArea"></div>
+</div>
+
+<script>
+    // ==========================================
+    // 👇👇👇 請在這裡填入您的 API Key 👇👇👇
+    // ==========================================
+    const USER_API_KEY = ""; // 請在引號內填入您的 Key
+    // ==========================================
+
+    const TIMEFRAMES = [
+        { label: '4h', chartId: 'chart4h', infoId: 'info4h', color: '#c084fc' },
+        { label: '1h', chartId: 'chart1h', infoId: 'info1h', color: '#818cf8' },
+        { label: '15m', chartId: 'chart15m', infoId: 'info15m', color: '#38bdf8' }
+    ];
+    let charts = {}; 
+    const FETCH_LIMIT = 1000;   
+    const DISPLAY_LIMIT = 150; 
+
+    const apiKeyInput = document.getElementById('apiKey');
+    const loadModelsBtn = document.getElementById('loadModelsBtn');
+    const modelSelect = document.getElementById('modelSelect');
+    const runBtn = document.getElementById('runBtn');
+    const resultArea = document.getElementById('resultArea');
+
+    const fmt = (num) => { const n = Number(num); return (num === null || num === undefined || isNaN(n)) ? 'N/A' : n.toFixed(1); };
+    function getStatusColor(val, type) {
+        if(val===null||val===undefined) return 'val-neutral';
+        if(type==='rsi') return val>70?'val-warn':(val<30?'val-up':'val-neutral');
+        if(type==='vol') return val==='爆量'?'val-warn':(val==='縮量'?'val-neutral':'val-neutral');
+        return 'val-neutral';
+    }
+
+    // Auto Configuration on Load
+    window.addEventListener('DOMContentLoaded', () => {
+        if(USER_API_KEY && USER_API_KEY.length > 10) {
+            apiKeyInput.value = USER_API_KEY;
+            // 自動觸發載入
+            setTimeout(() => {
+                console.log("Auto-loading models...");
+                loadModelsBtn.click();
+            }, 500);
+        } else {
+            // 如果沒填代碼中的 Key，試著讀取舊的
+            const savedKey = localStorage.getItem('gemini_api_key');
+            if(savedKey) apiKeyInput.value = savedKey;
+        }
+    });
+
+    loadModelsBtn.addEventListener('click', async () => {
+        const key = apiKeyInput.value.trim();
+        if(!key) { alert('請輸入 API Key'); return; }
+        
+        // 只有當使用者手動輸入時才存到 localStorage，避免覆蓋寫死的 Key
+        if(key !== USER_API_KEY) localStorage.setItem('gemini_api_key', key);
+        
+        loadModelsBtn.textContent = '⏳';
+        loadModelsBtn.disabled = true;
+
+        try {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+            if(!res.ok) throw new Error('Key 無效或網路錯誤');
+            const data = await res.json();
+            const models = (data.models || [])
+                .filter(m => m.name.includes('gemini') && m.supportedGenerationMethods?.includes('generateContent'))
+                .sort((a,b) => (b.name.includes('flash') ? 1 : 0) - (a.name.includes('flash') ? 1 : 0));
+            
+            if(models.length === 0) throw new Error('無可用模型');
+
+            modelSelect.innerHTML = '';
+            models.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.name; opt.text = m.displayName || m.name.replace('models/', '');
+                modelSelect.appendChild(opt);
+            });
+            modelSelect.disabled = false;
+            runBtn.disabled = false;
+            loadModelsBtn.textContent = '✅';
+            loadModelsBtn.style.backgroundColor = '#10b981';
+            loadModelsBtn.style.color = 'black';
+        } catch(e) {
+            console.error(e);
+            alert('載入失敗: ' + e.message);
+            loadModelsBtn.textContent = '❌';
+        } finally {
+            loadModelsBtn.disabled = false;
+        }
+    });
+
+    function calculateEMA(closes, period) {
+        if (closes.length < period) return new Array(closes.length).fill(null);
+        const k = 2 / (period + 1);
+        let result = new Array(closes.length).fill(null);
+        let sum = 0;
+        for(let i=0; i<period; i++) sum += closes[i];
+        result[period-1] = sum / period;
+        for(let i=period; i<closes.length; i++) result[i] = closes[i] * k + result[i-1] * (1-k);
+        return result;
+    }
+
+    function calculateRSI(closes, period=14) {
+        if(closes.length < period + 1) return new Array(closes.length).fill(null);
+        let rsi = new Array(closes.length).fill(null);
+        let gains=0, losses=0;
+        for(let i=1; i<=period; i++) {
+            let diff = closes[i] - closes[i-1];
+            if(diff>0) gains+=diff; else losses+=Math.abs(diff);
+        }
+        let avgGain = gains/period; let avgLoss = losses/period;
+        rsi[period] = 100 - (100/(1 + avgGain/avgLoss));
+        for(let i=period+1; i<closes.length; i++) {
+            let diff = closes[i] - closes[i-1];
+            let g = diff>0?diff:0; let l = diff<0?Math.abs(diff):0;
+            avgGain = (avgGain*(period-1) + g)/period;
+            avgLoss = (avgLoss*(period-1) + l)/period;
+            rsi[i] = 100 - (100/(1 + avgGain/avgLoss));
+        }
+        return rsi;
+    }
+
+    runBtn.addEventListener('click', async () => {
+        const key = apiKeyInput.value.trim();
+        const symbol = document.getElementById('symbol').value.toUpperCase();
+        if(!key || !symbol) return;
+        
+        runBtn.disabled = true; runBtn.innerHTML = '<div class="spinner"></div> 分析中...'; resultArea.style.display = 'none';
+
+        try {
+            const requests = TIMEFRAMES.map(tf => 
+                fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${tf.label}&limit=${FETCH_LIMIT}`)
+                    .then(r => { if(!r.ok) throw new Error('找不到幣種'); return r.json(); })
+            );
+            const results = await Promise.all(requests);
+            
+            let aiTextSummary = `### 技術數據 (${symbol})\n*數據精度: 小數點後1位*\n\n`;
+
+            results.forEach((rawData, index) => {
+                const tf = TIMEFRAMES[index];
+                const closes = rawData.map(d => parseFloat(d[4]));
+                const volumes = rawData.map(d => parseFloat(d[5]));
+                const fullEma50 = calculateEMA(closes, 50);
+                const fullEma200 = calculateEMA(closes, 200);
+                const fullRsi = calculateRSI(closes, 14);
+
+                const sliceCount = -DISPLAY_LIMIT;
+                const viewRawData = rawData.slice(sliceCount);
+                const viewCloses = closes.slice(sliceCount);
+                const viewVolumes = volumes.slice(sliceCount);
+                const viewEma50 = fullEma50.slice(sliceCount);
+                const viewEma200 = fullEma200.slice(sliceCount);
+                const viewRsi = fullRsi.slice(sliceCount);
+
+                const candles = viewRawData.map(d => ({ x: new Date(d[0]), y: [parseFloat(d[1]),parseFloat(d[2]),parseFloat(d[3]),parseFloat(d[4])] }));
+                const volData = viewRawData.map(d => ({ x: new Date(d[0]), y: parseFloat(d[5]), fillColor: parseFloat(d[4])>=parseFloat(d[1])?'#10b981':'#ef4444' }));
+                const ema50Series = viewRawData.map((d, i) => ({ x: new Date(d[0]), y: viewEma50[i] }));
+                const ema200Series = viewRawData.map((d, i) => ({ x: new Date(d[0]), y: viewEma200[i] }));
+
+                const lastIdx = viewCloses.length - 1;
+                const price = viewCloses[lastIdx];
+                const vLast = viewVolumes[lastIdx];
+                const rsiVal = viewRsi[lastIdx];
+                const valEma50 = viewEma50[lastIdx];
+                const valEma200 = viewEma200[lastIdx];
+                const isBull = (valEma200 !== null && price > valEma200);
+
+                let vSum=0, count=Math.min(20, viewVolumes.length);
+                for(let k=lastIdx-(count-1); k<=lastIdx; k++) vSum+=viewVolumes[k];
+                const vAvg = vSum/count;
+                const vStatus = vLast > vAvg*1.5 ? "爆量" : (vLast < vAvg*0.5 ? "縮量" : "正常");
+
+                document.getElementById(tf.infoId).innerHTML = `
+                    <table class="data-table">
+                        <tr><td class="dt-label">Price</td><td class="dt-val" style="color:white; font-size:1.3em;">${fmt(price)}</td></tr>
+                        <tr><td class="dt-label">RSI(14)</td><td class="dt-val ${getStatusColor(rsiVal, 'rsi')}">${fmt(rsiVal)}</td></tr>
+                        <tr><td class="dt-label">Volume</td><td class="dt-val ${getStatusColor(vStatus, 'vol')}">${vStatus}</td></tr>
+                        <tr><td colspan="2" style="border-bottom:1px solid #555; height:10px;"></td></tr>
+                        <tr><td class="dt-label">EMA 50</td><td class="dt-val" style="color:#00E396">${fmt(valEma50)}</td></tr>
+                        <tr><td class="dt-label">EMA 200</td><td class="dt-val" style="color:#FF4560">${fmt(valEma200)}</td></tr>
+                        <tr><td class="dt-label">Trend</td><td class="dt-val ${isBull?'val-up':'val-down'}">${isBull?'Bull':'Bear'}</td></tr>
+                    </table>`;
+
+                aiTextSummary += `**${tf.label.toUpperCase()}**:\n- Price: ${fmt(price)}\n- RSI: ${fmt(rsiVal)}\n- Vol: ${fmt(vLast)} (${vStatus})\n- EMA50: ${fmt(valEma50)}\n- EMA200: ${fmt(valEma200)}\n---\n`;
+
+                if(charts[tf.label]) charts[tf.label].destroy();
+                const options = {
+                    series: [
+                        { name: 'Price', type: 'candlestick', data: candles },
+                        { name: 'EMA 50', type: 'line', data: ema50Series },
+                        { name: 'EMA 200', type: 'line', data: ema200Series },
+                        { name: 'Vol', type: 'bar', data: volData }
+                    ],
+                    chart: { type: 'line', height: 520, background: '#1e293b', toolbar: {show: false}, animations: {enabled: false}, fontFamily: 'Segoe UI' },
+                    stroke: { width: [1, 2, 2, 0], colors: ['#fff', '#00E396', '#FF4560', 'transparent'] },
+                    colors: ['#fff', '#00E396', '#FF4560', '#546E7A'],
+                    plotOptions: { candlestick: { colors: { upward: '#10b981', downward: '#ef4444' } }, bar: { columnWidth: '50%' } },
+                    xaxis: { type: 'datetime', labels: {style: {colors: '#94a3b8'}} },
+                    yaxis: [{ labels: { style: {colors: '#94a3b8'}, formatter: (v)=>typeof v==='number'?v.toFixed(1):'' }, tooltip: {enabled: true}, forceNiceScale: true, decimalsInFloat: 1 }, { opposite: true, labels: {show: false}, max: (m)=>m*4 }],
+                    grid: { borderColor: '#334155' }, theme: { mode: 'dark' }, tooltip: { shared: true, intersect: false, theme: 'dark', y: {formatter: (v)=>typeof v==='number'?v.toFixed(1):'N/A'} }
+                };
+                charts[tf.label] = new ApexCharts(document.querySelector(`#${tf.chartId}`), options);
+                charts[tf.label].render();
+            });
+
+            await new Promise(r => setTimeout(r, 1200));
+            const img4h = await charts['4h'].dataURI(); const img1h = await charts['1h'].dataURI(); const img15m = await charts['15m'].dataURI();
+
+            const prompt = `你是一位資深的加密貨幣合約操盤手。${symbol} 三個時區數據 (高精度) 如下：\n${aiTextSummary}\n請進行深度技術分析：\n### 1. 趨勢與結構掃描\n- **4H**: 趨勢？EMA排列？\n- **1H**: 形態？RSI？\n- **15M**: 進場點？背離？\n### 2. 多空邏輯\n- 看多/看空理由\n### 3. 合約交易計畫 (R:R > 1:2)\n- 決策 (多/空/觀望)\n- 進場 $${fmt(results[2][results[2].length-1][4])}\n- 止損 SL\n- 止盈 TP`;
+            
+            const payload = { contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: "image/png", data: img4h.imgURI.split(',')[1] } }, { text: "4H" }, { inline_data: { mime_type: "image/png", data: img1h.imgURI.split(',')[1] } }, { text: "1H" }, { inline_data: { mime_type: "image/png", data: img15m.imgURI.split(',')[1] } }, { text: "15M" }] }] };
+
+            const model = document.getElementById('modelSelect').value;
+            const apiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/${model}:generateContent?key=${key}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+            const apiData = await apiRes.json();
+            if(apiData.error) throw new Error(apiData.error.message);
+            resultArea.innerHTML = marked.parse(apiData.candidates[0].content.parts[0].text);
+            resultArea.style.display = 'block';
+
+        } catch(e) { console.error(e); alert('錯誤: ' + e.message); } finally { runBtn.disabled = false; runBtn.textContent = '🚀 啟動高精度分析'; }
+    });
+</script>
+</body>
+</html>
