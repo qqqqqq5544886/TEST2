@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Binance Futures Pro (Auto-Config)</title>
+    <title>Binance Futures Pro (Visual Tuned)</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <style>
@@ -36,7 +36,6 @@
         .data-table tr:last-child td { border-bottom: none; }
         .dt-label { color: #9ca3af; }
         .dt-val { text-align: right; font-weight: bold; font-family: 'Courier New', monospace; font-size: 1.1em; }
-        
         .val-up { color: var(--up); } .val-down { color: var(--down); } .val-warn { color: #fbbf24; } .val-neutral { color: #e5e7eb; }
         
         #resultArea { background: var(--panel-bg); padding: 40px; border-radius: 12px; display: none; border: 1px solid var(--border); line-height: 1.8; font-size: 1.05em; border-left: 5px solid var(--accent); margin-top: 40px; }
@@ -49,12 +48,12 @@
 <body>
 
 <div class="container">
-    <h1>Binance Futures Pro (Auto)</h1>
+    <h1>Binance Futures Pro (Visual Tuned)</h1>
 
     <div class="controls">
         <div class="input-group">
             <label>1. Gemini API Key</label>
-            <input type="password" id="apiKey" placeholder="請在程式碼下方填入 Key">
+            <input type="password" id="apiKey" placeholder="Auto-saved">
             <button id="loadModelsBtn" class="btn btn-load">📡 載入模型</button>
         </div>
         <div class="input-group">
@@ -66,21 +65,44 @@
             <input type="text" id="symbol" value="BTCUSDT" placeholder="e.g. ETHUSDT">
         </div>
         <div class="input-group" style="justify-content: flex-end;">
-            <button id="runBtn" class="btn btn-run" disabled>🚀 啟動高精度分析</button>
+            <button id="runBtn" class="btn btn-run" disabled>🚀 啟動優化版分析</button>
         </div>
     </div>
 
-    <div class="timeframe-section"><div class="chart-col" id="chart4h"></div><div class="data-col"><div class="tf-label" style="background: rgba(192, 132, 252, 0.2); color: #c084fc;">4H 趨勢層</div><div id="info4h"></div></div></div>
-    <div class="timeframe-section"><div class="chart-col" id="chart1h"></div><div class="data-col"><div class="tf-label" style="background: rgba(129, 140, 248, 0.2); color: #818cf8;">1H 結構層</div><div id="info1h"></div></div></div>
-    <div class="timeframe-section"><div class="chart-col" id="chart15m"></div><div class="data-col"><div class="tf-label" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8;">15M 進場層</div><div id="info15m"></div></div></div>
+    <!-- 4H -->
+    <div class="timeframe-section">
+        <div class="chart-col" id="chart4h"></div>
+        <div class="data-col">
+            <div class="tf-label" style="background: rgba(192, 132, 252, 0.2); color: #c084fc;">4H 趨勢層</div>
+            <div id="info4h"></div>
+        </div>
+    </div>
+
+    <!-- 1H -->
+    <div class="timeframe-section">
+        <div class="chart-col" id="chart1h"></div>
+        <div class="data-col">
+            <div class="tf-label" style="background: rgba(129, 140, 248, 0.2); color: #818cf8;">1H 結構層</div>
+            <div id="info1h"></div>
+        </div>
+    </div>
+
+    <!-- 15M -->
+    <div class="timeframe-section">
+        <div class="chart-col" id="chart15m"></div>
+        <div class="data-col">
+            <div class="tf-label" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8;">15M 進場層</div>
+            <div id="info15m"></div>
+        </div>
+    </div>
+
     <div id="resultArea"></div>
 </div>
 
 <script>
     // ==========================================
-    // 👇👇👇 請在這裡填入您的 API Key 👇👇👇
-    // ==========================================
-    const USER_API_KEY = ""; // 請在引號內填入您的 Key
+    // 若要固定 Key，請填入下方 (不要上傳到公開網路)
+    const USER_API_KEY = ""; 
     // ==========================================
 
     const TIMEFRAMES = [
@@ -106,17 +128,11 @@
         return 'val-neutral';
     }
 
-    // Auto Configuration on Load
     window.addEventListener('DOMContentLoaded', () => {
         if(USER_API_KEY && USER_API_KEY.length > 10) {
             apiKeyInput.value = USER_API_KEY;
-            // 自動觸發載入
-            setTimeout(() => {
-                console.log("Auto-loading models...");
-                loadModelsBtn.click();
-            }, 500);
+            setTimeout(() => { loadModelsBtn.click(); }, 500);
         } else {
-            // 如果沒填代碼中的 Key，試著讀取舊的
             const savedKey = localStorage.getItem('gemini_api_key');
             if(savedKey) apiKeyInput.value = savedKey;
         }
@@ -125,41 +141,17 @@
     loadModelsBtn.addEventListener('click', async () => {
         const key = apiKeyInput.value.trim();
         if(!key) { alert('請輸入 API Key'); return; }
-        
-        // 只有當使用者手動輸入時才存到 localStorage，避免覆蓋寫死的 Key
         if(key !== USER_API_KEY) localStorage.setItem('gemini_api_key', key);
-        
-        loadModelsBtn.textContent = '⏳';
-        loadModelsBtn.disabled = true;
-
+        loadModelsBtn.textContent = '⏳'; loadModelsBtn.disabled = true;
         try {
             const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
-            if(!res.ok) throw new Error('Key 無效或網路錯誤');
             const data = await res.json();
-            const models = (data.models || [])
-                .filter(m => m.name.includes('gemini') && m.supportedGenerationMethods?.includes('generateContent'))
-                .sort((a,b) => (b.name.includes('flash') ? 1 : 0) - (a.name.includes('flash') ? 1 : 0));
-            
-            if(models.length === 0) throw new Error('無可用模型');
-
+            const models = (data.models || []).filter(m => m.name.includes('gemini') && m.supportedGenerationMethods?.includes('generateContent')).sort((a,b)=>(b.name.includes('flash')?1:0)-(a.name.includes('flash')?1:0));
             modelSelect.innerHTML = '';
-            models.forEach(m => {
-                const opt = document.createElement('option');
-                opt.value = m.name; opt.text = m.displayName || m.name.replace('models/', '');
-                modelSelect.appendChild(opt);
-            });
-            modelSelect.disabled = false;
-            runBtn.disabled = false;
-            loadModelsBtn.textContent = '✅';
-            loadModelsBtn.style.backgroundColor = '#10b981';
-            loadModelsBtn.style.color = 'black';
-        } catch(e) {
-            console.error(e);
-            alert('載入失敗: ' + e.message);
-            loadModelsBtn.textContent = '❌';
-        } finally {
-            loadModelsBtn.disabled = false;
-        }
+            models.forEach(m => { const opt = document.createElement('option'); opt.value = m.name; opt.text = m.displayName || m.name.replace('models/', ''); modelSelect.appendChild(opt); });
+            modelSelect.disabled = false; runBtn.disabled = false;
+            loadModelsBtn.textContent = '✅'; loadModelsBtn.style.backgroundColor = '#10b981'; loadModelsBtn.style.color = 'black';
+        } catch(e) { console.error(e); alert('載入失敗'); loadModelsBtn.textContent = '❌'; } finally { loadModelsBtn.disabled = false; }
     });
 
     function calculateEMA(closes, period) {
@@ -177,17 +169,12 @@
         if(closes.length < period + 1) return new Array(closes.length).fill(null);
         let rsi = new Array(closes.length).fill(null);
         let gains=0, losses=0;
-        for(let i=1; i<=period; i++) {
-            let diff = closes[i] - closes[i-1];
-            if(diff>0) gains+=diff; else losses+=Math.abs(diff);
-        }
+        for(let i=1; i<=period; i++) { let diff = closes[i] - closes[i-1]; if(diff>0) gains+=diff; else losses+=Math.abs(diff); }
         let avgGain = gains/period; let avgLoss = losses/period;
         rsi[period] = 100 - (100/(1 + avgGain/avgLoss));
         for(let i=period+1; i<closes.length; i++) {
-            let diff = closes[i] - closes[i-1];
-            let g = diff>0?diff:0; let l = diff<0?Math.abs(diff):0;
-            avgGain = (avgGain*(period-1) + g)/period;
-            avgLoss = (avgLoss*(period-1) + l)/period;
+            let diff = closes[i] - closes[i-1]; let g = diff>0?diff:0; let l = diff<0?Math.abs(diff):0;
+            avgGain = (avgGain*(period-1) + g)/period; avgLoss = (avgLoss*(period-1) + l)/period;
             rsi[i] = 100 - (100/(1 + avgGain/avgLoss));
         }
         return rsi;
@@ -197,17 +184,12 @@
         const key = apiKeyInput.value.trim();
         const symbol = document.getElementById('symbol').value.toUpperCase();
         if(!key || !symbol) return;
-        
-        runBtn.disabled = true; runBtn.innerHTML = '<div class="spinner"></div> 分析中...'; resultArea.style.display = 'none';
+        runBtn.disabled = true; runBtn.innerHTML = '<div class="spinner"></div> 運算中...'; resultArea.style.display = 'none';
 
         try {
-            const requests = TIMEFRAMES.map(tf => 
-                fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${tf.label}&limit=${FETCH_LIMIT}`)
-                    .then(r => { if(!r.ok) throw new Error('找不到幣種'); return r.json(); })
-            );
+            const requests = TIMEFRAMES.map(tf => fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${tf.label}&limit=${FETCH_LIMIT}`).then(r => r.json()));
             const results = await Promise.all(requests);
-            
-            let aiTextSummary = `### 技術數據 (${symbol})\n*數據精度: 小數點後1位*\n\n`;
+            let aiTextSummary = `### 技術數據 (${symbol})\n*數據精度: 1位小數*\n\n`;
 
             results.forEach((rawData, index) => {
                 const tf = TIMEFRAMES[index];
@@ -259,17 +241,40 @@
                 if(charts[tf.label]) charts[tf.label].destroy();
                 const options = {
                     series: [
-                        { name: 'Price', type: 'candlestick', data: candles },
-                        { name: 'EMA 50', type: 'line', data: ema50Series },
+                        { name: 'Price', type: 'candlestick', data: candles }, 
+                        { name: 'EMA 50', type: 'line', data: ema50Series }, 
                         { name: 'EMA 200', type: 'line', data: ema200Series },
                         { name: 'Vol', type: 'bar', data: volData }
                     ],
                     chart: { type: 'line', height: 520, background: '#1e293b', toolbar: {show: false}, animations: {enabled: false}, fontFamily: 'Segoe UI' },
                     stroke: { width: [1, 2, 2, 0], colors: ['#fff', '#00E396', '#FF4560', 'transparent'] },
                     colors: ['#fff', '#00E396', '#FF4560', '#546E7A'],
+                    
+                    // 🔥 修正 1：透明度改為 0.5 (更清楚，但仍可透視)
+                    fill: { opacity: [1, 1, 1, 0.5] }, 
+                    
                     plotOptions: { candlestick: { colors: { upward: '#10b981', downward: '#ef4444' } }, bar: { columnWidth: '50%' } },
                     xaxis: { type: 'datetime', labels: {style: {colors: '#94a3b8'}} },
-                    yaxis: [{ labels: { style: {colors: '#94a3b8'}, formatter: (v)=>typeof v==='number'?v.toFixed(1):'' }, tooltip: {enabled: true}, forceNiceScale: true, decimalsInFloat: 1 }, { opposite: true, labels: {show: false}, max: (m)=>m*4 }],
+                    yaxis: [
+                        { 
+                            seriesName: 'Price',
+                            labels: { style: {colors: '#94a3b8'}, formatter: (v)=>typeof v==='number'?v.toFixed(1):'' }, 
+                            tooltip: {enabled: true},
+                            forceNiceScale: true, 
+                            min: (min) => min - (min * 0.002), 
+                            max: (max) => max + (max * 0.002)
+                        }, 
+                        { seriesName: 'Price', show: false },
+                        { seriesName: 'Price', show: false },
+                        
+                        // 🔥 修正 2：最大值改為 4 倍 (高度佔 25%)，且 min 設為 0
+                        { 
+                            seriesName: 'Vol', 
+                            opposite: true, labels: {show: false}, 
+                            min: 0,
+                            max: (max) => max * 4 
+                        }
+                    ],
                     grid: { borderColor: '#334155' }, theme: { mode: 'dark' }, tooltip: { shared: true, intersect: false, theme: 'dark', y: {formatter: (v)=>typeof v==='number'?v.toFixed(1):'N/A'} }
                 };
                 charts[tf.label] = new ApexCharts(document.querySelector(`#${tf.chartId}`), options);
@@ -279,7 +284,7 @@
             await new Promise(r => setTimeout(r, 1200));
             const img4h = await charts['4h'].dataURI(); const img1h = await charts['1h'].dataURI(); const img15m = await charts['15m'].dataURI();
 
-            const prompt = `你是一位資深的加密貨幣合約操盤手。${symbol} 三個時區數據 (高精度) 如下：\n${aiTextSummary}\n請進行深度技術分析：\n### 1. 趨勢與結構掃描\n- **4H**: 趨勢？EMA排列？\n- **1H**: 形態？RSI？\n- **15M**: 進場點？背離？\n### 2. 多空邏輯\n- 看多/看空理由\n### 3. 合約交易計畫 (R:R > 1:2)\n- 決策 (多/空/觀望)\n- 進場 $${fmt(results[2][results[2].length-1][4])}\n- 止損 SL\n- 止盈 TP`;
+            const prompt = `你是一位資深的加密貨幣合約操盤手。${symbol} 三個時區數據如下：\n${aiTextSummary}\n請進行深度技術分析：\n### 1. 趨勢與結構掃描\n- **4H**: 趨勢？EMA排列？\n- **1H**: 形態？RSI？\n- **15M**: 進場點？背離？\n### 2. 多空邏輯\n- 看多/看空理由\n### 3. 合約交易計畫 (R:R > 1:2)\n- 決策 (多/空/觀望)\n- 進場 $${fmt(results[2][results[2].length-1][4])}\n- 止損 SL\n- 止盈 TP`;
             
             const payload = { contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: "image/png", data: img4h.imgURI.split(',')[1] } }, { text: "4H" }, { inline_data: { mime_type: "image/png", data: img1h.imgURI.split(',')[1] } }, { text: "1H" }, { inline_data: { mime_type: "image/png", data: img15m.imgURI.split(',')[1] } }, { text: "15M" }] }] };
 
@@ -290,7 +295,7 @@
             resultArea.innerHTML = marked.parse(apiData.candidates[0].content.parts[0].text);
             resultArea.style.display = 'block';
 
-        } catch(e) { console.error(e); alert('錯誤: ' + e.message); } finally { runBtn.disabled = false; runBtn.textContent = '🚀 啟動高精度分析'; }
+        } catch(e) { console.error(e); alert('錯誤: ' + e.message); } finally { runBtn.disabled = false; runBtn.textContent = '🚀 啟動優化版分析'; }
     });
 </script>
 </body>
