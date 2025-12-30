@@ -3,30 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Binance Futures Pro (Classic)</title>
+    <title>Binance Futures Pro (Chat)</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    
     <style>
         :root {
             --bg-color: #0f172a; --card-bg: #1e293b; --panel-bg: #111827;
             --accent: #f59e0b; --text: #e2e8f0; --border: #334155;
-            --up: #10b981; --down: #ef4444;
+            --user-msg: #1d4ed8; --ai-msg: #374151;
         }
         body { font-family: 'Segoe UI', Roboto, Helvetica, sans-serif; background: var(--bg-color); color: var(--text); margin: 0; padding: 20px; }
         .container { width: 100%; max-width: 1800px; margin: 0 auto; }
+        
         h1 { text-align: center; background: linear-gradient(to right, #f59e0b, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0 0 20px 0; font-weight: 800; font-size: 2rem; }
         
+        /* Controls */
         .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; background: var(--card-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 30px; }
         .input-group { display: flex; flex-direction: column; gap: 5px; }
         label { font-size: 0.85em; color: #94a3b8; font-weight: 600; }
         input, select { padding: 12px; background: var(--bg-color); border: 1px solid var(--border); color: white; border-radius: 6px; outline: none; font-size: 1rem; }
         input:focus { border-color: var(--accent); }
-        .btn { border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        
+        .btn { border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
         .btn-load { background: #374151; color: white; }
         .btn-run { background: linear-gradient(135deg, var(--accent), #d97706); color: black; font-size: 1.1em; height: 100%; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3); }
         .btn-export { background: #3b82f6; color: white; height: 100%; font-size: 1.1em; display: none; }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+        /* Chart & Data */
         .timeframe-section { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 30px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; padding: 20px; }
         .chart-col { flex: 3; min-width: 600px; height: 520px; }
         .data-col { flex: 1; min-width: 280px; background: var(--panel-bg); border-radius: 12px; padding: 20px; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: center; }
@@ -37,21 +42,62 @@
         .data-table tr:last-child td { border-bottom: none; }
         .dt-label { color: #9ca3af; }
         .dt-val { text-align: right; font-weight: bold; font-family: 'Courier New', monospace; font-size: 1.1em; }
-        .val-up { color: var(--up); } .val-down { color: var(--down); } .val-warn { color: #fbbf24; } .val-neutral { color: #e5e7eb; }
+        .val-up { color: #10b981; } .val-down { color: #ef4444; } .val-warn { color: #fbbf24; } .val-neutral { color: #e5e7eb; }
         
-        #resultArea { background: var(--panel-bg); padding: 40px; border-radius: 12px; display: none; border: 1px solid var(--border); line-height: 1.8; font-size: 1.05em; border-left: 5px solid var(--accent); margin-top: 40px; }
-        #resultArea h2 { color: #f59e0b; border-bottom: 1px solid #374151; padding-bottom: 10px; margin-top: 1.5em; }
-        #resultArea h3 { color: #cbd5e1; margin-top: 1.5em; } 
-        #resultArea strong { color: #fff; }
+        /* Chat & Result Area */
+        #chatSection { display: none; margin-top: 40px; }
+        
+        /* 聊天記錄區 */
+        .chat-log { 
+            display: flex; flex-direction: column; gap: 20px; margin-bottom: 20px; 
+        }
+        
+        .chat-msg { 
+            padding: 20px; border-radius: 12px; line-height: 1.6; max-width: 90%; 
+            position: relative; animation: fadeIn 0.3s ease;
+        }
+        .msg-ai { 
+            background: var(--card-bg); border-left: 4px solid var(--accent); align-self: flex-start; 
+        }
+        .msg-user { 
+            background: rgba(30, 58, 138, 0.5); border-right: 4px solid #3b82f6; align-self: flex-end; 
+            text-align: right; margin-left: auto;
+        }
+        /* User message markdown override to align right */
+        .msg-user p { margin: 0; } 
+
+        /* 聊天輸入區 */
+        .chat-input-box {
+            background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 15px;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .chat-tools { display: flex; align-items: center; gap: 10px; }
+        #chatText { 
+            width: 100%; background: #0f172a; border: 1px solid var(--border); color: white; 
+            padding: 15px; border-radius: 8px; resize: vertical; min-height: 80px; outline: none;
+        }
+        #chatText:focus { border-color: var(--accent); }
+        .btn-send { background: #3b82f6; color: white; padding: 10px 25px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-send:hover { background: #2563eb; }
+        
+        /* Markdown Styles within Chat */
+        .chat-msg h2 { color: #f59e0b; margin-top: 0.5em; font-size: 1.3em; }
+        .chat-msg strong { color: #fff; }
+        .chat-msg ul { padding-left: 20px; }
+
         .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s infinite linear; margin-right: 8px; }
         @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .preview-img { max-height: 100px; border-radius: 4px; border: 1px solid #555; margin-top: 5px; display: none; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>Binance Futures Pro <span style="font-size:0.5em; color:#94a3b8">Classic</span></h1>
+    <h1>Binance Futures Pro <span style="font-size:0.5em; color:#94a3b8">Interactive</span></h1>
 
+    <!-- Controls -->
     <div class="controls">
         <div class="input-group">
             <label>1. Gemini API Key</label>
@@ -60,11 +106,12 @@
         </div>
         <div class="input-group">
             <label>2. AI Model</label>
-            <select id="modelSelect" disabled><option>等待載入...</option></select>
+            <select id="modelSelect" disabled><option>請先載入...</option></select>
         </div>
         <div class="input-group">
             <label>3. 合約幣種</label>
-            <input type="text" id="symbol" value="BTCUSDT" placeholder="e.g. PEPEUSDT">
+            <input type="text" id="symbol" list="coinList" placeholder="輸入或選擇 (如 BTCUSDT)" style="text-transform: uppercase;">
+            <datalist id="coinList"></datalist>
         </div>
         <div class="input-group" style="flex-direction: row; gap: 10px; justify-content: flex-end; align-items: flex-end;">
             <button id="runBtn" class="btn btn-run" disabled>🚀 啟動分析</button>
@@ -77,12 +124,37 @@
     <div class="timeframe-section"><div class="chart-col" id="chart1h"></div><div class="data-col"><div class="tf-label" style="background: rgba(129, 140, 248, 0.2); color: #818cf8;">1H 結構層</div><div id="info1h"></div></div></div>
     <div class="timeframe-section"><div class="chart-col" id="chart15m"></div><div class="data-col"><div class="tf-label" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8;">15M 進場層</div><div id="info15m"></div></div></div>
     
-    <div id="resultArea"></div>
+    <!-- Chat Section (取代原本單純的 ResultArea) -->
+    <div id="chatSection">
+        <h2 style="color: #94a3b8; border-bottom: 1px solid #334155; padding-bottom: 10px;">💬 策略研討室 (AI Co-Pilot)</h2>
+        
+        <!-- 對話紀錄區 -->
+        <div id="chatLog" class="chat-log"></div>
+
+        <!-- 輸入區 -->
+        <div class="chat-input-box">
+            <textarea id="chatText" placeholder="輸入您的看法... (例如：我覺得 1H 這裡好像是假突破？)"></textarea>
+            
+            <div class="chat-tools">
+                <label for="chatImgInput" class="btn btn-load" style="font-size:0.9em; padding:8px 15px; cursor:pointer;">
+                    📷 上傳佐證圖片
+                </label>
+                <input type="file" id="chatImgInput" accept="image/*" style="display:none;">
+                <span id="imgName" style="color:#94a3b8; font-size:0.8em;"></span>
+                <div style="flex:1;"></div>
+                <button id="sendChatBtn" class="btn-send">發送討論 ➤</button>
+            </div>
+            <img id="chatImgPreview" class="preview-img">
+        </div>
+    </div>
 </div>
 
 <script>
+    // ==========================================
     const USER_API_KEY = ""; 
+    // ==========================================
 
+    const POPULAR_COINS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT", "PEPEUSDT", "WIFUSDT", "SUIUSDT", "APTUSDT"];
     const TIMEFRAMES = [
         { label: '4h', chartId: 'chart4h', infoId: 'info4h', color: '#c084fc' },
         { label: '1h', chartId: 'chart1h', infoId: 'info1h', color: '#818cf8' },
@@ -92,19 +164,31 @@
     const FETCH_LIMIT = 1000;
     const DISPLAY_LIMIT = 150; 
 
-    // Export State
+    // Chat History State
+    let chatHistory = []; // 儲存對話上下文
     let exportedPrompt = "";
     let exportedImages = {};
     let currentAnalysisSymbol = "";
 
+    // DOM
     const apiKeyInput = document.getElementById('apiKey');
     const loadModelsBtn = document.getElementById('loadModelsBtn');
     const modelSelect = document.getElementById('modelSelect');
     const runBtn = document.getElementById('runBtn');
     const exportBtn = document.getElementById('exportBtn');
-    const resultArea = document.getElementById('resultArea');
+    const symbolInput = document.getElementById('symbol');
+    const coinList = document.getElementById('coinList');
+    
+    // Chat DOM
+    const chatSection = document.getElementById('chatSection');
+    const chatLog = document.getElementById('chatLog');
+    const chatText = document.getElementById('chatText');
+    const sendChatBtn = document.getElementById('sendChatBtn');
+    const chatImgInput = document.getElementById('chatImgInput');
+    const chatImgPreview = document.getElementById('chatImgPreview');
+    const imgName = document.getElementById('imgName');
 
-    // Smart Format
+    // Helper
     const smartFmt = (num) => {
         const n = Number(num);
         if (num === null || num === undefined || isNaN(n)) return 'N/A';
@@ -121,7 +205,31 @@
         if(val===null||val===undefined) return 'val-neutral';
         if(type==='rsi') return val>70?'val-warn':(val<30?'val-up':'val-neutral');
         if(type==='vol') return val==='爆量'?'val-warn':(val==='縮量'?'val-neutral':'val-neutral');
+        if(type==='ma') return val.includes('纏繞')?'val-warn':(val.includes('多')?'val-up':'val-down');
         return 'val-neutral';
+    }
+
+    // Init & Load
+    function initCoinList() {
+        if(!coinList) return;
+        const history = JSON.parse(localStorage.getItem('coin_history') || '[]');
+        const allCoins = [...new Set([...history, ...POPULAR_COINS])];
+        coinList.innerHTML = ''; 
+        allCoins.forEach(coin => {
+            const option = document.createElement('option');
+            option.value = coin;
+            coinList.appendChild(option);
+        });
+        if(!symbolInput.value) symbolInput.value = history.length > 0 ? history[0] : "BTCUSDT";
+    }
+
+    function saveCoinHistory(symbol) {
+        let history = JSON.parse(localStorage.getItem('coin_history') || '[]');
+        history = history.filter(c => c !== symbol);
+        history.unshift(symbol);
+        if(history.length > 10) history = history.slice(0, 10);
+        localStorage.setItem('coin_history', JSON.stringify(history));
+        initCoinList();
     }
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -132,6 +240,7 @@
             const savedKey = localStorage.getItem('gemini_api_key');
             if(savedKey) apiKeyInput.value = savedKey;
         }
+        initCoinList();
     });
 
     loadModelsBtn.addEventListener('click', async () => {
@@ -151,6 +260,7 @@
         } catch(e) { console.error(e); alert('載入失敗'); loadModelsBtn.textContent = '❌'; } finally { loadModelsBtn.disabled = false; }
     });
 
+    // Calculations
     function calculateEMA(closes, period) {
         if (closes.length < period) return new Array(closes.length).fill(null);
         const k = 2 / (period + 1);
@@ -177,40 +287,130 @@
         return rsi;
     }
 
+    // Export Logic
     function downloadBase64(base64, filename) {
-        const link = document.createElement('a');
-        link.href = base64; link.download = filename;
+        const link = document.createElement('a'); link.href = base64; link.download = filename;
         document.body.appendChild(link); link.click(); document.body.removeChild(link);
     }
-
     exportBtn.addEventListener('click', () => {
         if(!exportedPrompt) return;
         const now = new Date();
         const timeStr = `${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}-${String(now.getMinutes()).padStart(2,'0')}`;
         const sym = currentAnalysisSymbol || "CRYPTO";
-
-        navigator.clipboard.writeText(exportedPrompt).then(() => {
-            alert(`✅ 提示詞已複製！\n\n圖片正在下載...`);
-        });
-
+        navigator.clipboard.writeText(exportedPrompt).then(() => { alert(`✅ 複製成功！圖片下載中...`); });
         if(exportedImages['4h']) downloadBase64(exportedImages['4h'], `${sym}_4H_${timeStr}.png`);
         setTimeout(() => { if(exportedImages['1h']) downloadBase64(exportedImages['1h'], `${sym}_1H_${timeStr}.png`); }, 300);
         setTimeout(() => { if(exportedImages['15m']) downloadBase64(exportedImages['15m'], `${sym}_15M_${timeStr}.png`); }, 600);
     });
 
+    // --- Chat Functions ---
+    function appendMessage(role, text) {
+        const div = document.createElement('div');
+        div.className = `chat-msg ${role === 'user' ? 'msg-user' : 'msg-ai'}`;
+        div.innerHTML = marked.parse(text); // Use markdown for both
+        chatLog.appendChild(div);
+        // Scroll to bottom
+        window.scrollTo(0, document.body.scrollHeight);
+    }
+
+    // Image Input Handling
+    chatImgInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            imgName.textContent = file.name;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                chatImgPreview.src = e.target.result;
+                chatImgPreview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // Send Chat
+    sendChatBtn.addEventListener('click', async () => {
+        const msg = chatText.value.trim();
+        const file = chatImgInput.files[0];
+        
+        if (!msg && !file) return;
+
+        // 1. UI Update
+        const userDisplayMsg = msg + (file ? `<br>*(附圖: ${file.name})*` : "");
+        appendMessage('user', userDisplayMsg);
+        
+        chatText.value = '';
+        chatImgInput.value = '';
+        imgName.textContent = '';
+        chatImgPreview.style.display = 'none';
+        
+        const originalBtnText = sendChatBtn.textContent;
+        sendChatBtn.disabled = true;
+        sendChatBtn.textContent = "AI 思考中...";
+
+        // 2. Prepare Payload
+        const newParts = [];
+        if (msg) newParts.push({ text: msg });
+        
+        if (file) {
+            const base64Data = chatImgPreview.src.split(',')[1];
+            newParts.push({ inline_data: { mime_type: file.type, data: base64Data } });
+        }
+
+        // Add to history
+        chatHistory.push({ role: "user", parts: newParts });
+
+        // 3. API Call with History
+        try {
+            const model = document.getElementById('modelSelect').value;
+            const key = apiKeyInput.value.trim();
+            
+            const apiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/${model}:generateContent?key=${key}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ contents: chatHistory })
+            });
+            
+            const apiData = await apiRes.json();
+            if(apiData.error) throw new Error(apiData.error.message);
+
+            const aiResponse = apiData.candidates[0].content.parts[0].text;
+            
+            // Add AI response to history
+            chatHistory.push({ role: "model", parts: [{ text: aiResponse }] });
+            
+            appendMessage('model', aiResponse);
+
+        } catch (error) {
+            console.error(error);
+            appendMessage('model', `❌ 錯誤: ${error.message}`);
+        } finally {
+            sendChatBtn.disabled = false;
+            sendChatBtn.textContent = originalBtnText;
+        }
+    });
+
+    // --- Main Run Analysis ---
     runBtn.addEventListener('click', async () => {
         const key = apiKeyInput.value.trim();
-        const symbol = document.getElementById('symbol').value.toUpperCase();
+        const symbol = symbolInput.value.toUpperCase().trim();
         if(!key || !symbol) return;
         
+        saveCoinHistory(symbol);
         currentAnalysisSymbol = symbol;
+        
+        // Reset Chat
+        chatSection.style.display = 'none';
+        chatLog.innerHTML = '';
+        chatHistory = []; // Clear history for new analysis
+
         runBtn.disabled = true; runBtn.innerHTML = '<div class="spinner"></div> 運算中...'; 
-        resultArea.style.display = 'none'; exportBtn.style.display = 'none';
+        exportBtn.style.display = 'none';
 
         try {
             const requests = TIMEFRAMES.map(tf => fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${tf.label}&limit=${FETCH_LIMIT}`).then(r => r.json()));
             const results = await Promise.all(requests);
-            let aiTextSummary = `### 技術數據 (${symbol})\n*採用動態智能精度*\n\n`;
+            
+            let aiTextSummary = `### 技術數據 (${symbol})\n*數據精度: 自動適應*\n\n`;
 
             results.forEach((rawData, index) => {
                 const tf = TIMEFRAMES[index];
@@ -239,12 +439,21 @@
                 const rsiVal = viewRsi[lastIdx];
                 const valEma50 = viewEma50[lastIdx];
                 const valEma200 = viewEma200[lastIdx];
-                const isBull = (valEma200 !== null && price > valEma200);
 
                 let vSum=0, count=Math.min(20, viewVolumes.length);
                 for(let k=lastIdx-(count-1); k<=lastIdx; k++) vSum+=viewVolumes[k];
                 const vAvg = vSum/count;
                 const vStatus = vLast > vAvg*1.5 ? "爆量" : (vLast < vAvg*0.5 ? "縮量" : "正常");
+
+                let maStatus = "不明";
+                if (valEma200 !== null) {
+                    const isMajor = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT"].includes(symbol);
+                    const threshold = isMajor ? 0.5 : 1.2;
+                    const gapPercent = Math.abs(valEma50 - valEma200) / price * 100;
+                    if (gapPercent < threshold) maStatus = `⚠️ 均線纏繞 (<${threshold}%)`;
+                    else if (valEma50 > valEma200) maStatus = "🟢 多頭排列";
+                    else maStatus = "🔴 空頭排列";
+                }
 
                 document.getElementById(tf.infoId).innerHTML = `
                     <table class="data-table">
@@ -254,10 +463,10 @@
                         <tr><td colspan="2" style="border-bottom:1px solid #555; height:10px;"></td></tr>
                         <tr><td class="dt-label">EMA 50</td><td class="dt-val" style="color:#00E396">${smartFmt(valEma50)}</td></tr>
                         <tr><td class="dt-label">EMA 200</td><td class="dt-val" style="color:#FF4560">${smartFmt(valEma200)}</td></tr>
-                        <tr><td class="dt-label">Trend</td><td class="dt-val ${isBull?'val-up':'val-down'}">${isBull?'Bull':'Bear'}</td></tr>
+                        <tr><td class="dt-label">狀態</td><td class="dt-val ${getStatusColor(maStatus, 'ma')}" style="font-size:0.9em">${maStatus}</td></tr>
                     </table>`;
 
-                aiTextSummary += `**${tf.label.toUpperCase()}**:\n- Price: ${smartFmt(price)}\n- RSI: ${smartFmt(rsiVal)}\n- Vol: ${smartFmt(vLast)} (${vStatus})\n- EMA50: ${smartFmt(valEma50)}\n- EMA200: ${smartFmt(valEma200)}\n---\n`;
+                aiTextSummary += `**${tf.label.toUpperCase()}**:\n- Price: ${smartFmt(price)}\n- RSI: ${smartFmt(rsiVal)}\n- Vol: ${smartFmt(vLast)} (${vStatus})\n- EMA50: ${smartFmt(valEma50)}\n- EMA200: ${smartFmt(valEma200)}\n- MA狀態: ${maStatus}\n---\n`;
 
                 if(charts[tf.label]) charts[tf.label].destroy();
                 const options = {
@@ -286,10 +495,9 @@
                 charts[tf.label].render();
             });
 
-            await new Promise(r => setTimeout(r, 1200));
+            await new Promise(r => setTimeout(r, 1500)); 
             const img4h = await charts['4h'].dataURI(); const img1h = await charts['1h'].dataURI(); const img15m = await charts['15m'].dataURI();
 
-            // 🔥 恢復為您喜歡的「經典分析風格」Prompt 🔥
             const prompt = `
                 你是一位資深的加密貨幣合約操盤手。
                 我提供了 ${symbol} 的三個時區圖表 (4H/1H/15M) 與精確數據。
@@ -303,19 +511,22 @@
                 - **1H (結構)**: 識別價格形態 (中繼/反轉)，RSI 是否健康？
                 - **15M (觸發)**: 尋找短線背離、突破或回踩訊號。
 
-                ### 2. 多空理由彙整 (Confluence)
-                *請列出你觀察到的所有有利於多方或空方的訊號*
+                ### 2. 均線狀態特別分析 ⚠️
+                *請檢查數據中的「MA狀態」，若顯示「均線纏繞」：*
+                - 請建議 **「箱體策略」**：支撐位做多，壓力位做空。
+                *若顯示「多頭/空頭排列」：*
+                - 請建議 **「趨勢跟隨策略」**：回踩 EMA 進場。
+
+                ### 3. 多空理由彙整
                 - 🟢 **看多依據**: ...
                 - 🔴 **看空依據**: ...
 
-                ### 3. 交易失效條件 (Setup Invalidation) ⚠️
-                *這很重要，請定義什麼情況下必須放棄此交易*
+                ### 4. 交易失效條件 (Invalidation)
                 - 例如：「若 1H 實體黑 K 跌破 EMA200，則多頭劇本失效。」
 
-                ### 4. 交易執行計畫 (Execution)
-                *請尋找高盈虧比 (R:R > 1:2) 的掛單機會，不要盲目追市價*
-                
-                - **決策**: 做多 (Long) / 做空 (Short) / 觀望 (Wait)
+                ### 5. 交易執行計畫 (Execution)
+                *盈虧比 > 1:2*
+                - **決策**: 做多 / 做空 / 觀望
                 - **建議進場**: $_______ (請尋找 EMA 回踩或支撐互換位)
                 - **止損 (SL)**: $_______ (結構外)
                 - **止盈 (TP)**: $_______
@@ -328,13 +539,34 @@
             exportedImages['15m'] = img15m.imgURI;
             exportBtn.style.display = 'block';
 
+            // --- 1. Prepare Initial Context ---
+            chatHistory = [{
+                role: "user",
+                parts: [
+                    { text: prompt },
+                    { inline_data: { mime_type: "image/png", data: img4h.imgURI.split(',')[1] } },
+                    { text: "這是 4H 圖表" },
+                    { inline_data: { mime_type: "image/png", data: img1h.imgURI.split(',')[1] } },
+                    { text: "這是 1H 圖表" },
+                    { inline_data: { mime_type: "image/png", data: img15m.imgURI.split(',')[1] } },
+                    { text: "這是 15M 圖表" }
+                ]
+            }];
+
             const model = document.getElementById('modelSelect').value;
-            const apiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/${model}:generateContent?key=${key}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: "image/png", data: img4h.imgURI.split(',')[1] } }, { text: "4H" }, { inline_data: { mime_type: "image/png", data: img1h.imgURI.split(',')[1] } }, { text: "1H" }, { inline_data: { mime_type: "image/png", data: img15m.imgURI.split(',')[1] } }, { text: "15M" }] }] }) });
+            const apiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/${model}:generateContent?key=${key}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ contents: chatHistory }) });
             
             const apiData = await apiRes.json();
             if(apiData.error) throw new Error(apiData.error.message);
-            resultArea.innerHTML = marked.parse(apiData.candidates[0].content.parts[0].text);
-            resultArea.style.display = 'block';
+            
+            const analysisText = apiData.candidates[0].content.parts[0].text;
+            
+            // --- 2. Save Assistant Response ---
+            chatHistory.push({ role: "model", parts: [{ text: analysisText }] });
+
+            // Display in Chat
+            chatSection.style.display = 'block';
+            appendMessage('model', analysisText);
 
         } catch(e) { console.error(e); alert('錯誤: ' + e.message); } finally { runBtn.disabled = false; runBtn.textContent = '🚀 啟動分析'; }
     });
